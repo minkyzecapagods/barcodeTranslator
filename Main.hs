@@ -130,7 +130,7 @@ tryWriteFile path content = do
 
 getCharAndProcess :: IO (Maybe ())
 getCharAndProcess = do
-    putStr "AVISO: O arquivo ja existe. Você deseja sobreescreve-lo? (s/n)"
+    putStr "\nAVISO: O arquivo ja existe. Você deseja sobreescreve-lo? (s/n) "
     c <- getChar
     _ <- getLine
     case c of
