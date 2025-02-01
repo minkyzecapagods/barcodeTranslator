@@ -7,6 +7,7 @@ import System.IO.Error (tryIOError)
 import System.Directory (doesFileExist)
 import Data.Char (isDigit, intToDigit, digitToInt)
 import Data.List (foldl')
+import Text.Read (readMaybe)
 
 -- Argumentos opcionais
 data Options = Options
@@ -95,16 +96,37 @@ extractFromFile filename = do
     Right content -> processContent content
 
 processContent :: String -> IO ()
-processContent content = case checkSize (lines content) of
+processContent content = case checkFormat (lines content) of
   Left err -> hPutStrLn stderr err
-  Right (width, height, lines) -> case getIdentifier width height lines of
+  Right (width, lines) -> case getIdentifier width lines of
     Left err -> hPutStrLn stderr err
     Right identifier -> putStrLn $ "Identificador: " ++ identifier
 
-
-
 mainGenerator :: [String] -> IO ()
-mainGenerator args = do
+mainGenerator args = 
+  case parseOptions args of
+    Left err -> hPutStrLn stderr err
+    Right (opts, identifier) -> handleValidInput opts identifier
+
+handleValidInput :: Options -> String -> IO ()
+handleValidInput opts identifier = 
+  case validateIdentifier identifier of
+    Left err -> hPutStrLn stderr err
+    Right validId -> processPBMGeneration opts validId
+
+processPBMGeneration :: Options -> String -> IO ()
+processPBMGeneration opts validId = 
+  case createPBMInfo opts validId of
+    Left err -> hPutStrLn stderr err
+    Right pbmImage -> createAndSavePBMImage pbmImage opts
+
+createAndSavePBMImage :: PBMImage-> Options -> IO ()
+createAndSavePBMImage pbmImage opts = do
+  result <- createPBMImage pbmImage (height opts) (margin opts)
+  either (hPutStrLn stderr) (const $ putStrLn "Arquivo criado com sucesso!") result
+{-
+mainGenerator2 :: [String] -> IO ()
+mainGenerator2 args = do
   case parseOptions args of
     Left err   -> hPutStrLn stderr err
     Right (opts, identifier) -> do
@@ -130,47 +152,69 @@ mainExtractor args = do
                             Right (width, height, lines) -> case getIdentifier width height lines of
                                       Left err -> hputStrLn stderr err
                                       Right identifier -> putStrLn $ "Identificador: " ++ identifier
+-}
 
--- Função auxiliar para extrair dígitos de uma parte do código de barras
-extractDigits :: [[Char]] -> String -> String
-extractDigits codes barcodePart =
-  let chunks = chunksOf 7 barcodePart  -- Divide o código em blocos de 7 caracteres
-  in map (findDigit codes) chunks  -- Converte cada bloco em um dígito
+-- EXTRATOR FUNCIAONA
+extractDigits :: String -> String
+extractDigits barcode =
+  let chunks = chunksOf 7 barcode  -- Divide o código em blocos de 7 caracteres
+  in (map (findDigit lCodes) (take 4 chunks)) ++ (map (findDigit rCodes) (drop 4 chunks))-- Converte cada bloco em um dígito
 
--- Função para dividir uma lista em sublistas de tamanho fixo
+-- EXTRATOR Funciona
 chunksOf :: Int -> String -> [String]
 chunksOf _ [] = []
 chunksOf n xs = take n xs : chunksOf n (drop n xs)
 
--- Função para encontrar o dígito correspondente a um bloco de código
-findDigit :: [[Char]] -> String -> Char
+-- EXTRATOR funciona
+findDigit :: [String] -> String -> Char
 findDigit codes chunk =
-  let digit = length (takeWhile (/= chunk) codes)  -- Encontra o índice do bloco na lista de códigos
+  let digit = length (takeWhile (/= chunk) codes)
   in if digit < 10
-       then intToDigit digit  -- Converte o índice para um caractere numérico
+       then intToDigit digit
        else error "ERRO: Bloco de código inválido."
 
-getOriginalCode :: String -> Int -> Maybe String
-getOriginalCode [] n = Nothing
-getOriginalCode ls@(l:_) n = Just (l : getOriginal (drop n ls))
 
+--EXTRATOR funciona
+getThinBarcode :: String -> Int -> String
+getThinBarcode [] n = []
+getThinBarcode ls@(l:_) n = l : (getThinBarcode (drop n ls) n)
+
+--EXTRATOR funciona
 getArea :: String -> Int 
 getArea [] = 0
-getArea (l:ls) = Just (if l == 1 then 1 + (getArea ls) else 0)
+getArea (l:ls) = if l == '1' then 1 + (getArea ls) else 0
 
+--EXTRATOR funciona
 getMargin :: [String] -> Int
 getMargin [] = 0
-getMargin (l:ls) = if all (== '0') then (1 + getMargin ls) else 0  
+getMargin (l:ls) = if all (== '0') l then (1 + getMargin ls) else 0  
 
-checkSize :: [String] -> Either String (Int, Int)
-checkSize (f:d:ls)
+--EXTRATOR funciona
+checkFormat :: [String] -> Either String (Int, [String])
+checkFormat (f:d:ls)
   | f /= "P1" = Left "ERRO: Formato do arquivo invalido."
   | ls == []  = Left "ERRO: Arquivo não possui codigo para leitura."
   | otherwise = case checkDimensions (words d) of
-      Nothing     -> Left "ERRO: Dimensões invalidas."
-      Just (w, h) -> Right (w, h, ls)
-checkSize _ = Left "ERRO: Arquivo nao possui conteudo suficiente."
+      Nothing     -> Left "ERRO: Dimensoes invalidas."
+      Just (w, _) -> Right (w, ls)
+checkFormat _ = Left "ERRO: Arquivo nao possui conteudo suficiente."
 
+checkArea :: String -> Either String Int
+checkArea barcode = case getArea barcode of
+  0 -> Left "ERRO: A margem do documento está fora do padrão ou o documento não possui um código de barras."
+  a -> Right a
+
+getIdentifier :: Int -> [String] -> Either String String
+getIdentifier w ls = do
+  let margin = getMargin ls
+  let noMarginBarcode = take (w - margin * 2) (drop margin (ls !! margin))
+  area <- checkArea noMarginBarcode
+  let barcode = getThinBarcode noMarginBarcode area
+  leftNRightCode <- checkBarcode barcode
+  let identifier = extractDigits leftNRightCode
+  validateIdentifier identifier
+
+{-
 getIdentifier :: [String] -> Int -> Int -> Either String String
 getIdentifier ls w h = let m = getMargin ls
                            extendedBarcode = ls !! m
@@ -186,29 +230,33 @@ getIdentifier ls w h = let m = getMargin ls
                                                 Left err -> Left err
                                                 Right id -> Right id
 
-                                                
+                                             
+-}
 
-checkBarcode :: String -> Maybe String
+-- EXTRATOR funciona??
+checkBarcode :: String -> Either String String
 checkBarcode bs =
                  let (start, rest) = splitAt 3 bs
-                     (leftCode, rest) = splitAt 28 rest
-                     (middle, rest) = splitAt 5 rest
-                     (rightCode, end) = splitAt 28 rest
-                 in if star == "101" || end == "101" || middle == "01010"
-                      then Just (leftCode ++ rightCode)
-                      else Nothing
+                     (leftCode, rest') = splitAt 28 rest
+                     (middle, rest'') = splitAt 5 rest'
+                     (rightCode, end) = splitAt 28 rest''
+                 in if start == "101" && end == "101" && middle == "01010"
+                      then Right (leftCode ++ rightCode)
+                      else Left ("ERRO: O codigo nao esta de acordo com os padroes EAN8.")
 
+--EXTRATOR funciona
 checkDimensions :: [String] -> Maybe (Int, Int)
 checkDimensions [w, h] =
   let width = readMaybe w :: Maybe Int
       height = readMaybe h :: Maybe Int
-  in case (width, height, ls) of
+  in case (width, height) of
     (Just w, Just h) -> if h > maxSize || w > maxSize || h < 1 && w < codeLen 
                           then Nothing
                           else Just (w, h)
     _ -> Nothing
 checkDimensions _ = Nothing
 
+--funciona
 createPBMInfo :: Options -> String -> Either String PBMImage
 createPBMInfo info id =
   let heightPBM = height info + 2 * margin info
@@ -219,11 +267,11 @@ createPBMInfo info id =
       ean8CodePBM = toEAN8 id
       barcodeLinePBM = createBarcodeLine (area info) ean8CodePBM
   in if heightPBM > maxSize  || widthPBM > maxSize 
-        || height info < 1 || area info < 1 || margin < 0
+        || height info < 1 || area info < 1 || margin info < 1
           then Left "ERRO: Dimensões inválidas."
-          else Right PBMImage widthPBM heightPBM filenamePBM ean8CodePBM barcodeLinePBM
+          else Right (PBMImage widthPBM heightPBM filenamePBM ean8CodePBM barcodeLinePBM)
 
-
+--funciona
 createPBMImage :: PBMImage -> Int -> Int -> IO (Either String ())
 createPBMImage pbmImage height margin = do
   let marginLine = replicate (totalWidth pbmImage) '0'
@@ -235,6 +283,7 @@ createPBMImage pbmImage height margin = do
         replicate margin marginLine
   tryWriteFile (filename pbmImage) content
 
+--funciona
 tryWriteFile :: FilePath -> String -> IO (Either String ())
 tryWriteFile path content = do
   exists <- doesFileExist path
@@ -246,6 +295,7 @@ tryWriteFile path content = do
         Just _  -> writeFile path content >> return (Right ())
     else writeFile path content >> return (Right ())
 
+--funciona
 getCharAndProcess :: IO (Maybe ())
 getCharAndProcess = do
     putStr "\nAVISO: O arquivo ja existe. Você deseja sobreescreve-lo? (s/n) "
@@ -261,6 +311,7 @@ getCharAndProcess = do
 createBarcodeLine :: Int -> String -> String
 createBarcodeLine area ean8Code = concatMap (\c -> replicate area c) ean8Code
 
+--funciona
 toEAN8 :: String -> String
 toEAN8 id =
   let left = concatMap (\c -> lCodes !! digitToInt c) (take 4 id)
@@ -268,6 +319,7 @@ toEAN8 id =
       right = concatMap (\c -> rCodes !! digitToInt c) (drop 4 id)
   in "101" ++ left ++ middle ++ right ++ "101"
 
+--funciona
 validateIdentifier :: String -> Either String String
 validateIdentifier id
   | length id /= 8                     = Left "ERRO: O identificador deve conter exatamente 8 digitos."
@@ -275,6 +327,7 @@ validateIdentifier id
   | last id /= getVerificationDigit id = Left ("ERRO: Digito verificador invalido. O ultimo digito deve ser " ++ [getVerificationDigit id] ++ ".")
   | otherwise                          = Right id
 
+--funciona
 getVerificationDigit :: String -> Char
 getVerificationDigit id =
   let sum = foldl' (\acc (i, c) -> acc + (digitToInt c) * (if odd i then 3 else 1)) 0 (zip [1..] (take 7 id))
@@ -282,7 +335,7 @@ getVerificationDigit id =
       digit = nextMulTen - sum
   in intToDigit digit
 
--- Mudei aq
+-- funciona
 parseOptions :: [String] -> Either String (Options, String)
 parseOptions args = 
   let (actions, nonOptions, errors) = getOpt RequireOrder options args
@@ -291,7 +344,7 @@ parseOptions args =
       else case nonOptions of
         []           -> Left "ERRO: Argumento identificador nao informado."
         [identifier] -> Right ((foldl' (flip id) defaultOptions actions), identifier)
-        _            -> Left "ERRO: Mais de um argumento identificador informado."
+        _            -> Left "ERRO: Mais de um argumento identificador informado ou o identificador nao foi inserido no final do comando."
 
 generatorUsage :: IO ()
 generatorUsage = putStrLn "Uso ./gen <opcoes> <identificador>"
