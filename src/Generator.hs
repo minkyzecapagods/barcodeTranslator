@@ -74,4 +74,21 @@ getVerificationDigit identifier =
   in intToDigit digit
 
 generatorUsage :: IO ()
-generatorUsage = putStrLn "Uso ./gen <opcoes> <identificador>"
+generatorUsage = do
+    putStrLn "GERADOR DE CODIGO DE BARRAS"
+    putStrLn "\tGera um arquivo PBM baseado no input do usuario."
+    putStrLn "Uso:"
+    putStrLn "\t./barcodeTranslator gen<opcao> ... <identificador>"
+    putStrLn "Opcoes:"
+    putStrLn "\t-m <pixels>"
+    putStrLn "\t\tDeixa o usuario definir a margem baseado no input em <pixels>"
+    putStrLn "\t\tSem -m, a margem sera de 4px."
+    putStrLn "\t-a <pixels>"
+    putStrLn "\t\tDeixa o usuario definir a area das barras baseado no input em <pixels>"
+    putStrLn "\t\tSem -a, a area sera de 3px."
+    putStrLn "\t-h <pixels>"
+    putStrLn "\t\tDeixa o usuario definir a altura do codigo de barras baseado no input em <pixels>"
+    putStrLn "\t\tSem -h, a altura sera de 50px."
+    putStrLn "\t-n <file_name>"
+    putStrLn "\t\tDeixa o usuario definir o nome do arquivo .pbm gerado baseado no input <file_name>"
+    putStrLn "\t\tSem -n, o nome do arquivo sera o identificador fornecido."
