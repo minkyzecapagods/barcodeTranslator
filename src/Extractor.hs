@@ -80,4 +80,11 @@ checkDimensions [w, h] =
 checkDimensions _ = Nothing
 
 extractorUsage :: IO ()
-extractorUsage = putStrLn "Uso: 'ext <nome_do_arquivo>'"
+extractorUsage = do
+    putStrLn "LEITOR DE CODIGO DE BARRAS"
+    putStrLn "\tExtrai o identificador do codigo de barras no arquivo .pbm informado."
+    putStrLn "\tPara acessar arquivos dentro da pasta 'barcode-output', inserir o caminho 'barcode-output/' antes do nome do arquivo."
+    putStrLn "Uso:"
+    putStrLn "\t./EAN-8_code_extractor <nome_do_arquivo>"
+    putStrLn "Uso:"
+    putStrLn "\t./barcodeTranslator ext <nome_do_arquivo>"
