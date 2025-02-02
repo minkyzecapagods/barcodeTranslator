@@ -15,7 +15,7 @@ main = do
   processArgs args
 
 processArgs :: [String] -> IO ()
-processArgs [] = generatorUsage
+processArgs [] = mainUsage
 processArgs ("gen":rest) = mainGenerator rest
 processArgs ("ext":rest) = mainExtractor rest
 processArgs _ = putStrLn "ERRO: Comando inválido. Use 'gen' ou 'ext'."
@@ -81,3 +81,15 @@ validateIdentifier identifier
   | not (all isDigit identifier) = Left "ERRO: O identificador deve conter apenas numeros."
   | last identifier /= getVerificationDigit identifier = Left ("ERRO: Digito verificador invalido. O ultimo digito deve ser " ++ [getVerificationDigit identifier] ++ ".")
   | otherwise = Right identifier
+
+mainUsage :: IO ()
+mainUsage = do
+    putStrLn "TRADUTOR DE CODIGO DE BARRAS"
+    putStrLn "\tGera um codigo de barras a partir de um identificador ou extrai um identificador a partir de um codigo de barras."
+    putStrLn "Uso:"
+    putStrLn "\t./barcodeTranslator <opcao>"
+    putStrLn "Opcoes:"
+    putStrLn "\tgen"
+    putStrLn "\t\tGera um arquivo PBM baseado no input do usuario."
+    putStrLn "\text"
+    putStrLn "\t\tExtrai o identificador do codigo de barras no arquivo .pbm informado."
