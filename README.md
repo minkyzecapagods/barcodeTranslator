@@ -8,6 +8,8 @@ Este programa contém duas funcionalidades principais para a criação e leitura
 - **Gerador de Código de Barras** (`gen`): Gera um arquivo `.pbm` com um código de barras baseado nas opções fornecidas.
 - **Leitor de Código de Barras** (`ext`): Extrai o identificador de um código de barras a partir de um arquivo `.pbm`.
 
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.0.0-orange)
+
 ### Tecnologias Utilizadas
 
 - **Linguagem de Programação**: Haskell;
